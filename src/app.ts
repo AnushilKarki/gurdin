@@ -1,13 +1,26 @@
 import express, { Request, Response } from 'express';
 import axios from 'axios';
 import { parseString } from 'xml2js';
+import NodeCache from 'node-cache';
 
 const app = express();
 const API_KEY = 'f98362c3-d776-433d-9513-ff0546b60c2d';
 const guardianBaseUrl = 'https://content.guardianapis.com';
 
+// Create a cache with a 10-minute (600 seconds) validity
+const cache = new NodeCache({ stdTTL: 600 });
+
 app.get('/api/:section', async (req: Request, res: Response) => {
-  const section = req.params.section;
+  
+ const section = req.params.section;
+
+  // Check if the data is already in the cache
+  const cachedData = cache.get(section);
+
+  if (cachedData) {
+    // If data is found in the cache, serve it
+    res.json(cachedData);
+  } else {
   const rssUrl = `${guardianBaseUrl}/${section}?format=xml&api-key=${API_KEY}`;
 
 
@@ -22,10 +35,13 @@ app.get('/api/:section', async (req: Request, res: Response) => {
       if (err) {
         res.status(500).json({ error: 'Error parsing RSS feed' });
       } else {
+          // Cache the result with a 10-minute validity
+          cache.set(section, result);
         res.json(result);
       }
+
     });
-  
+  }
 });
 app.get("/api/async/:section", async (req, res) => {
 	try {
